@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Timestamp Notes</title>
+  <meta name="theme-color" content="#0f1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <style>
+    :root { --bg:#0f1117; --card:#151823; --text:#e5e7eb; --muted:#9aa0aa; --line:#222636; --accent:#3b82f6; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:-apple-system, system-ui, Segoe UI, Roboto, Inter, sans-serif; }
+    .wrap { max-width: 840px; margin:0 auto; padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 24px); }
+    header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    h1 { font-size:18px; margin:0; letter-spacing:.2px; }
+    .btn { appearance:none; border:1px solid var(--line); background:#1a1f2e; color:var(--text); padding:12px 14px; border-radius:12px; font-weight:600; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
+    .btn.danger { background:#ef4444; border-color:#ef4444; color:#fff; }
+    .row { display:flex; gap:8px; }
+    .grow { flex:1; }
+    .card { background: var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); margin-bottom:12px; }
+    input[type="text"], textarea { width:100%; background:#0f1320; color:var(--text); border:1px solid #23283a; border-radius:10px; padding:12px; outline:none; }
+    input[type="text"]:focus, textarea:focus { border-color:#2e3550; }
+    .muted { color:var(--muted); font-size:12px; }
+    .list li { list-style:none; padding:12px; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; background:#131827; display:flex; align-items:center; gap:10px; }
+    .list .title { font-weight:600; }
+    .timer { font-variant-numeric: tabular-nums; font-size:40px; text-align:center; margin:6px 0 10px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { text-align:left; position: sticky; top: 0; background:#121625; z-index:1; }
+    .stamp-row { background:#101424; }
+    .toast { position:fixed; left:50%; transform:translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 20px); background:#1f2937; padding:10px 14px; border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.3); opacity:0; transition:opacity .2s; }
+    .toast.show { opacity:1; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button id="backBtn" class="btn hidden">Back</button>
+    <h1 id="title">Timestamp Notes</h1>
+    <div style="flex:1"></div>
+    <button id="helpBtn" class="btn">?</button>
+  </header>
+
+  <section id="listView">
+    <div class="card">
+      <div class="row">
+        <input id="newName" class="grow" type="text" placeholder="New instance name">
+        <button id="addBtn" class="btn primary">Create</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Create multiple instances (like notes). Each has its own timer & stamps.</div>
+    </div>
+    <ul id="instanceList" class="list"></ul>
+    <div class="card">
+      <div class="row">
+        <button id="backupBtn" class="btn">Backup (JSON)</button>
+        <button id="importBtn" class="btn">Import</button>
+        <input type="file" id="fileInput" accept=".json" class="hidden">
+      </div>
+      <div class="muted" style="margin-top:6px">Everything is local on your device, works offline.</div>
+    </div>
+  </section>
+
+  <section id="detailView" class="hidden">
+    <div class="card">
+      <div class="row">
+        <input id="instTitle" class="grow" type="text" placeholder="Instance title">
+        <button id="renameBtn" class="btn">Rename</button>
+        <button id="deleteBtn" class="btn danger">Delete</button>
+      </div>
+      <div class="timer"><span id="clock">0:00:00</span></div>
+      <div class="grid">
+        <button id="startBtn" class="btn primary">Start</button>
+        <button id="stopBtn" class="btn">Stop</button>
+        <button id="stampBtn" class="btn">Stamp</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Start begins from 0:00:00. Stop pauses. Stamp records the current time instantly.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="noteInput" type="text" placeholder="Optional note for next stamp…">
+        <button id="clearNote" class="btn">Clear</button>
+      </div>
+      <div class="muted" style="margin-top:6px">When you hit Stamp, this note is saved with the timestamp.</div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <button id="copyLatest" class="btn">Copy latest</button>
+        <button id="exportCsv" class="btn">Export CSV</button>
+      </div>
+      <div class="muted" style="margin-bottom:8px">Tap any timestamp to copy it. Notes are editable inline.</div>
+      <div style="max-height:45vh; overflow:auto; border:1px solid var(--line); border-radius:12px;">
+        <table id="stampTable">
+          <thead><tr><th>#</th><th>Time</th><th>Note</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast" class="toast">Copied</div>
+
+<script>
+// PWA register
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+}
+
+// Helpers
+const $ = (s) => document.querySelector(s);
+const listView = $('#listView'), detailView = $('#detailView');
+const instanceList = $('#instanceList'), toast = $('#toast');
+const newName = $('#newName'), addBtn = $('#addBtn');
+const backBtn = $('#backBtn'), titleEl = $('#title'), helpBtn = $('#helpBtn');
+const instTitle = $('#instTitle'), renameBtn = $('#renameBtn'), deleteBtn = $('#deleteBtn');
+const clock = $('#clock'), startBtn = $('#startBtn'), stopBtn = $('#stopBtn'), stampBtn = $('#stampBtn');
+const noteInput = $('#noteInput'), clearNote = $('#clearNote');
+const copyLatest = $('#copyLatest'), exportCsv = $('#exportCsv');
+const stampTableBody = document.querySelector('#stampTable tbody');
+
+let app = { instances: [], activeId: null }; // {id,name,created,elapsedMs,running,startedAt,stamps:[{ms,text,created}]}
+
+function uid(){ return 'id-'+Math.random().toString(36).slice(2,9); }
+function now(){ return Date.now(); }
+function fmt(ms){ ms=Math.max(0,Math.floor(ms)); const h=Math.floor(ms/3600000); const m=Math.floor((ms%3600000)/60000); const s=Math.floor((ms%60000)/1000); return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
+function load(){ try{ app = JSON.parse(localStorage.getItem('tsn.app')) || app; }catch(e){} }
+function save(){ localStorage.setItem('tsn.app', JSON.stringify(app)); }
+function getActive(){ return app.instances.find(x=>x.id===app.activeId); }
+function getElapsed(inst){ return inst.running ? inst.elapsedMs + (now()-inst.startedAt) : inst.elapsedMs; }
+function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=> toast.classList.remove('show'), 900); }
+
+// List view
+function renderList(){
+  instanceList.innerHTML='';
+  app.instances.sort((a,b)=> b.created-a.created);
+  app.instances.forEach(inst=>{
+    const li=document.createElement('li');
+    const t=document.createElement('div'); t.className='title'; t.textContent=inst.name||'Untitled';
+    const meta=document.createElement('div'); meta.className='muted'; meta.textContent=(inst.running?'Running • ':'')+fmt(getElapsed(inst))+' • '+new Date(inst.created).toLocaleString();
+    const open=document.createElement('button'); open.className='btn'; open.textContent='Open'; open.addEventListener('click',()=>openInstance(inst.id));
+    li.appendChild(t); li.appendChild(meta); li.appendChild(open);
+    instanceList.appendChild(li);
+  });
+}
+addBtn.addEventListener('click',()=>{
+  const name=(newName.value||'').trim();
+  const inst={id:uid(), name:name||'Untitled', created:now(), elapsedMs:0, running:false, startedAt:0, stamps:[]};
+  app.instances.push(inst); save(); newName.value=''; renderList(); openInstance(inst.id);
+});
+
+function openInstance(id){
+  app.activeId=id; save();
+  const inst=getActive(); instTitle.value=inst.name; clock.textContent=fmt(getElapsed(inst));
+  listView.classList.add('hidden'); detailView.classList.remove('hidden'); backBtn.classList.remove('hidden'); titleEl.textContent='Instance';
+  renderStamps(inst); resumeTick();
+}
+backBtn.addEventListener('click',()=>{
+  pauseTick(); app.activeId=null; save();
+  detailView.classList.add('hidden'); listView.classList.remove('hidden'); backBtn.classList.add('hidden'); titleEl.textContent='Timestamp Notes';
+  renderList();
+});
+
+// Timer
+let raf=null;
+function tick(){ const inst=getActive(); if(!inst) return; clock.textContent=fmt(getElapsed(inst)); raf=requestAnimationFrame(tick); }
+function resumeTick(){ const inst=getActive(); if(inst && inst.running && !raf) raf=requestAnimationFrame(tick); }
+function pauseTick(){ if(raf) cancelAnimationFrame(raf); raf=null; }
+
+startBtn.addEventListener('click',()=>{ const inst=getActive(); if(!inst) return; if(!inst.running){ inst.startedAt=now(); inst.running=true; save(); resumeTick(); } });
+stopBtn.addEventListener('click',()=>{ const inst=getActive(); if(!inst) return; if(inst.running){ inst.elapsedMs += now()-inst.startedAt; inst.running=false; inst.startedAt=0; save(); pauseTick(); clock.textContent=fmt(inst.elapsedMs);} });
+stampBtn.addEventListener('click',()=>{ const inst=getActive(); if(!inst) return; const ms=getElapsed(inst); const text=(noteInput.value||'').trim(); inst.stamps.push({ms,text,created:now()}); save(); renderStamps(inst); showToast('Stamped '+fmt(ms)); });
+
+clearNote.addEventListener('click',()=> noteInput.value='');
+renameBtn.addEventListener('click',()=>{ const inst=getActive(); if(!inst) return; inst.name=(instTitle.value||'').trim()||'Untitled'; save(); renderList(); showToast('Renamed'); });
+deleteBtn.addEventListener('click',()=>{ const inst=getActive(); if(!inst) return; if(!confirm('Delete this instance?')) return; app.instances=app.instances.filter(x=>x.id!==inst.id); app.activeId=null; save(); backBtn.click(); });
+
+function renderStamps(inst){
+  stampTableBody.innerHTML='';
+  inst.stamps.forEach((s,i)=>{
+    const tr=document.createElement('tr'); tr.className='stamp-row';
+    const tdIdx=document.createElement('td'); tdIdx.textContent=i+1;
+    const tdTime=document.createElement('td'); const btn=document.createElement('button'); btn.className='btn'; btn.textContent=fmt(s.ms);
+    btn.addEventListener('click', async()=>{ await navigator.clipboard.writeText(fmt(s.ms)); showToast('Copied '+fmt(s.ms)); });
+    tdTime.appendChild(btn);
+    const tdNote=document.createElement('td'); const ta=document.createElement('textarea'); ta.rows=1; ta.value=s.text||''; ta.addEventListener('input',()=>{ s.text=ta.value; save(); }); tdNote.appendChild(ta);
+    const tdDel=document.createElement('td'); const del=document.createElement('button'); del.className='btn'; del.textContent='Delete'; del.addEventListener('click',()=>{ inst.stamps.splice(i,1); save(); renderStamps(inst); }); tdDel.appendChild(del);
+    tr.appendChild(tdIdx); tr.appendChild(tdTime); tr.appendChild(tdNote); tr.appendChild(tdDel);
+    stampTableBody.appendChild(tr);
+  });
+}
+
+// Backup / Import
+const backupBtn = document.getElementById('backupBtn');
+const importBtn = document.getElementById('importBtn');
+const fileInput = document.getElementById('fileInput');
+
+backupBtn.addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(app,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='timestamp_notes_backup.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+importBtn.addEventListener('click',()=> fileInput.click());
+fileInput.addEventListener('change',(e)=>{
+  const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+  r.onload=()=>{ try{ const data=JSON.parse(r.result); if(Array.isArray(data.instances)){ app.instances=data.instances; app.activeId=data.activeId||null; save(); renderList(); if(app.activeId) openInstance(app.activeId); alert('Imported.'); } }catch(err){ alert('Invalid file.'); } };
+  r.readAsText(f);
+});
+
+copyLatest.addEventListener('click', async()=>{
+  const inst=getActive(); if(!inst || !inst.stamps.length){ showToast('No stamps'); return; }
+  const last=inst.stamps[inst.stamps.length-1]; await navigator.clipboard.writeText(fmt(last.ms)); showToast('Copied '+fmt(last.ms));
+});
+exportCsv.addEventListener('click',()=>{
+  const inst=getActive(); if(!inst) return;
+  const header=['index','time','ms','note','created_iso'];
+  const rows=inst.stamps.map((s,i)=>[i+1, fmt(s.ms), s.ms, '"'+String((s.text||'')).replace(/"/g,'""')+'"', new Date(s.created).toISOString()]);
+  const csv=[header.join(','), ...rows.map(r=> r.join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=(inst.name||'instance')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+});
+
+helpBtn.addEventListener('click',()=>{
+  alert('How it works:\n\n• Create instances (like separate notes).\n• Inside an instance: Start starts from 0:00:00, Stop pauses, Stamp saves the current time with the note above.\n• Everything autosaves locally and works offline.\n• Tap a time to copy it. Export CSV or full JSON backup.');
+});
+
+// Init
+(function init(){
+  // register SW early
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+  // load and render
+  try{ const raw=localStorage.getItem('tsn.app'); if(raw) app=JSON.parse(raw); }catch(e){}
+  renderList();
+  if(app.activeId){ openInstance(app.activeId); }
+})();
+</script>
+</body>
+</html>
